@@ -5,5 +5,9 @@ export default function App() {
     console.log("content view loaded");
   }, []);
 
-  return <div className="content-view text-lime-400">content view</div>;
+  return (
+    <div className="content-view text-red-400 fixed bottom-20 left-1/2">
+      Stop recording
+    </div>
+  );
 }

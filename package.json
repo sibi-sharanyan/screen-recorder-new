@@ -18,7 +18,8 @@
   "type": "module",
   "dependencies": {
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "recordrtc": "^5.6.2"
   },
   "devDependencies": {
     "@rollup/plugin-typescript": "^8.5.0",
@@ -28,6 +29,7 @@
     "@types/node": "18.15.11",
     "@types/react": "18.0.21",
     "@types/react-dom": "18.2.4",
+    "@types/recordrtc": "^5.6.11",
     "@types/ws": "^8.5.4",
     "@typescript-eslint/eslint-plugin": "5.56.0",
     "@typescript-eslint/parser": "5.38.1",
