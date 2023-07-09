@@ -9,61 +9,86 @@ import("./components/Demo");
 const audioCtx = new AudioContext();
 
 let recorder;
+let stream;
+
+async function recordScreen() {
+  return await navigator.mediaDevices.getDisplayMedia({
+    video: {
+      width: 3840,
+      height: 2160,
+    },
+    audio: true,
+  });
+}
+
+function saveFile(recordedChunks) {
+
+  const blob = new Blob(recordedChunks, {
+    type: 'video/webm'
+  });
+  const filename = window.prompt('Enter file name');
+  const downloadLink = document.createElement('a');
+  downloadLink.href = URL.createObjectURL(blob);
+  downloadLink.download = `${filename}.webm`;
+
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
+}
+
+function createRecorder(stream, mimeType) {
+  // the stream data is stored in this array
+  let recordedChunks = [];
+
+  const mediaRecorder = new MediaRecorder(stream);
+
+  mediaRecorder.ondataavailable = function (e) {
+    if (e.data.size > 0) {
+      recordedChunks.push(e.data);
+    }
+  };
+  mediaRecorder.onstop = function () {
+    saveFile(recordedChunks);
+    recordedChunks = [];
+
+    chrome.runtime.sendMessage({ action: "recording-stopped" });
+
+  };
+  mediaRecorder.start(200); // For every 200ms the stream data will be stored in a separate chunk.
+  return mediaRecorder;
+}
 
 chrome.runtime.onMessage.addListener(async function (
   request,
   sender,
   sendResponse
 ) {
+  console.log("message received", request.action);
+
+  if (request.action === "start-recording") {
+    stream = await recordScreen();
+    const mimeType = 'video/webm';
+    recorder = createRecorder(stream, mimeType);
+
+    chrome.runtime.sendMessage({ action: "recording-started" });
+  }
+
+  if (request.action == "stop-recording") {
+    console.log("stop recording");
+    recorder.stop();
+
+
+    stream.getTracks()
+      .forEach(track => track.stop())
+
+    chrome.runtime.sendMessage({ action: "recording-stopped" });
+    return;
+  }
+
   console.log(
     sender.tab
       ? "from a content script:" + sender.tab.url
       : "from the extension"
   );
-
-  console.log("audio devices", await navigator.mediaDevices.enumerateDevices());
-
-  const stream = await navigator.mediaDevices.getDisplayMedia({
-    video: {
-      width: 3840,
-      height: 2160,
-    },
-    audio: true,
-    frameRate: {
-      ideal: 60,
-    },
-  });
-
-  recorder = new MediaRecorder(stream);
-
-  if (stream.getAudioTracks().length == 0) {
-    console.log("No Audio");
-  }
-  recorder.addTrack(stream.getVideoTracks()[0]);
-
-  recorder.ondataavailable = (e) => {
-    console.log("data available");
-    console.log(e.data);
-
-    //download data
-
-    const blob = new Blob([e.data], { type: "video/webm" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "recorded_video.webm";
-    a.click();
-
-    URL.revokeObjectURL(url);
-  };
-
-  recorder.onMessage = (e) => {
-    console.log("message available");
-    console.log(e.data);
-  };
-
-  recorder.start();
-
   return true;
 });

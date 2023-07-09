@@ -43,7 +43,7 @@ const manifest: chrome.runtime.ManifestV3 = {
       matches: ["*://*/*"],
     },
   ],
-  permissions: ["desktopCapture"],
+  permissions: ["desktopCapture", "tabs"],
 };
 
 export default manifest;

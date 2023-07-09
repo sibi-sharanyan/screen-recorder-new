@@ -15,7 +15,7 @@ const Popup = () => {
           console.log(tab);
 
           const response = await chrome.tabs.sendMessage(tab.id || 0, {
-            greeting: "hello",
+            action: "start-recording",
           });
         }}
       >
