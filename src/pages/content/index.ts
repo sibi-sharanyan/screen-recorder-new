@@ -26,7 +26,11 @@ function saveFile(recordedChunks) {
   const blob = new Blob(recordedChunks, {
     type: 'video/webm'
   });
-  const filename = window.prompt('Enter file name');
+
+  const currentDate = new Date();
+  const dateString = currentDate.toDateString();
+
+  const filename = `video-${dateString}`;
   const downloadLink = document.createElement('a');
   downloadLink.href = URL.createObjectURL(blob);
   downloadLink.download = `${filename}.webm`;
