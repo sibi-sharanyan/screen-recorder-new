@@ -1,24 +1,31 @@
 console.log("content loaded");
-import RecordRTC from "recordrtc";
 
 /**
  * @description
  * Chrome extensions don't support modules in content scripts.
  */
 import("./components/Demo");
-const audioCtx = new AudioContext();
 
 let recorder;
 let stream;
 
 async function recordScreen() {
-  return await navigator.mediaDevices.getDisplayMedia({
+  // Capture the screen stream
+  const videoStream = await navigator.mediaDevices.getDisplayMedia({
     video: {
       width: 3840,
       height: 2160,
-    },
-    audio: true,
+    }
   });
+
+  // Capture the audio stream, you can adjust this to capture system sound or microphone
+  const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  // Combine tracks from both streams into one
+  const tracks = [...videoStream.getTracks(), ...audioStream.getTracks()];
+  const combinedStream = new MediaStream(tracks);
+
+  return combinedStream;
 }
 
 function saveFile(recordedChunks) {
@@ -44,7 +51,13 @@ function createRecorder(stream, mimeType) {
   // the stream data is stored in this array
   let recordedChunks = [];
 
-  const mediaRecorder = new MediaRecorder(stream);
+  const options = {
+    mimeType: mimeType,
+    audioBitsPerSecond: 128000,   // for audio
+    videoBitsPerSecond: 10000000  // for video, aiming for 10 Mbps
+  };
+
+  const mediaRecorder = new MediaRecorder(stream, options);
 
   mediaRecorder.ondataavailable = function (e) {
     if (e.data.size > 0) {
@@ -56,7 +69,6 @@ function createRecorder(stream, mimeType) {
     recordedChunks = [];
 
     chrome.runtime.sendMessage({ action: "recording-stopped" });
-
   };
   mediaRecorder.start(200); // For every 200ms the stream data will be stored in a separate chunk.
   return mediaRecorder;
@@ -71,7 +83,7 @@ chrome.runtime.onMessage.addListener(async function (
 
   if (request.action === "start-recording") {
     stream = await recordScreen();
-    const mimeType = 'video/webm';
+    const mimeType = 'video/webm; codecs="vp9,opus"';
     recorder = createRecorder(stream, mimeType);
 
     chrome.runtime.sendMessage({ action: "recording-started" });
