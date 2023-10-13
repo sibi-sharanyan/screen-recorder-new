@@ -83,6 +83,17 @@ chrome.runtime.onMessage.addListener(async function (
 
   if (request.action === "start-recording") {
     stream = await recordScreen();
+
+    const videoTrack = stream.getVideoTracks()[0];
+
+    videoTrack.onended = () => {
+      console.log('User stopped sharing the screen');
+      if (recorder && recorder.state === 'recording') {
+        recorder.stop();
+      }
+    };
+
+
     const mimeType = 'video/webm; codecs="vp9,opus"';
     recorder = createRecorder(stream, mimeType);
 
