@@ -29,7 +29,6 @@ async function recordScreen() {
 }
 
 function saveFile(recordedChunks) {
-
   const blob = new Blob(recordedChunks, {
     type: 'video/webm'
   });
@@ -37,14 +36,12 @@ function saveFile(recordedChunks) {
   const currentDate = new Date();
   const dateString = currentDate.toDateString();
 
-  const filename = `video-${dateString}`;
-  const downloadLink = document.createElement('a');
-  downloadLink.href = URL.createObjectURL(blob);
-  downloadLink.download = `${filename}.webm`;
+  const reader = new FileReader();
+  reader.readAsDataURL(blob);
+  reader.onloadend = () => {
+    chrome.runtime.sendMessage({ action: "uploadToDrive", data: reader.result });
+  };
 
-  document.body.appendChild(downloadLink);
-  downloadLink.click();
-  document.body.removeChild(downloadLink);
 }
 
 function createRecorder(stream, mimeType) {
@@ -59,9 +56,17 @@ function createRecorder(stream, mimeType) {
 
   const mediaRecorder = new MediaRecorder(stream, options);
 
-  mediaRecorder.ondataavailable = function (e) {
+  mediaRecorder.ondataavailable = async function (e) {
     if (e.data.size > 0) {
       recordedChunks.push(e.data);
+
+
+      const reader = new FileReader();
+      reader.readAsDataURL(e.data);
+      reader.onloadend = () => {
+        chrome.runtime.sendMessage({ action: "add-recording-chunk", data: reader.result });
+      };
+
     }
   };
   mediaRecorder.onstop = function () {
@@ -79,7 +84,7 @@ chrome.runtime.onMessage.addListener(async function (
   sender,
   sendResponse
 ) {
-  console.log("message received", request.action);
+  console.log("message received2", request.action);
 
   if (request.action === "start-recording") {
     stream = await recordScreen();

@@ -16,7 +16,7 @@ export default function App() {
   });
 
   return (
-    <div className="flex space-x-4 content-view fixed bottom-20 left-1/2">
+    <div className="space-x-4 content-view fixed bottom-20 left-1/2 hidden">
       {isRecording && (
         <button
           className="btn btn-error"
