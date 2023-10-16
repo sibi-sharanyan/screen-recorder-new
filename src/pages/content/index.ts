@@ -30,31 +30,8 @@ async function recordScreen() {
 }
 
 async function saveFile() {
-  const blobChunks = [];
+  chrome.runtime.sendMessage({ action: "uploadToDrive", data: chunkIndex });
 
-  for (let i = 0; i < chunkIndex; i++) {
-    const chunk = await new Promise<ArrayBuffer>(resolve => {
-      chrome.storage.local.get([`chunk_${i}`], result => {
-        resolve(new Uint8Array(result[`chunk_${i}`]).buffer as ArrayBuffer);
-      });
-    });
-    blobChunks.push(new Blob([chunk]));
-  }
-
-  const blob = new Blob(blobChunks, {
-    type: 'video/webm'
-  });
-
-  const reader = new FileReader();
-  reader.readAsDataURL(blob);
-  reader.onloadend = () => {
-    chrome.runtime.sendMessage({ action: "uploadToDrive", data: reader.result });
-  };
-
-  // Clear storage after sending the recorded video
-  for (let i = 0; i < chunkIndex; i++) {
-    chrome.storage.local.remove(`chunk_${i}`);
-  }
   chunkIndex = 0;
 }
 
