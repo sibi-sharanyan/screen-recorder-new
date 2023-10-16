@@ -8,6 +8,7 @@ import("./components/Demo");
 
 let recorder;
 let stream;
+let chunkIndex = 0;
 
 async function recordScreen() {
   // Capture the screen stream
@@ -28,13 +29,21 @@ async function recordScreen() {
   return combinedStream;
 }
 
-function saveFile(recordedChunks) {
-  const blob = new Blob(recordedChunks, {
+async function saveFile() {
+  const blobChunks = [];
+
+  for (let i = 0; i < chunkIndex; i++) {
+    const chunk = await new Promise<ArrayBuffer>(resolve => {
+      chrome.storage.local.get([`chunk_${i}`], result => {
+        resolve(new Uint8Array(result[`chunk_${i}`]).buffer as ArrayBuffer);
+      });
+    });
+    blobChunks.push(new Blob([chunk]));
+  }
+
+  const blob = new Blob(blobChunks, {
     type: 'video/webm'
   });
-
-  const currentDate = new Date();
-  const dateString = currentDate.toDateString();
 
   const reader = new FileReader();
   reader.readAsDataURL(blob);
@@ -42,37 +51,32 @@ function saveFile(recordedChunks) {
     chrome.runtime.sendMessage({ action: "uploadToDrive", data: reader.result });
   };
 
+  // Clear storage after sending the recorded video
+  for (let i = 0; i < chunkIndex; i++) {
+    chrome.storage.local.remove(`chunk_${i}`);
+  }
+  chunkIndex = 0;
 }
 
-function createRecorder(stream, mimeType) {
-  // the stream data is stored in this array
-  let recordedChunks = [];
 
+function createRecorder(stream, mimeType) {
   const options = {
     mimeType: mimeType,
-    audioBitsPerSecond: 128000,   // for audio
-    videoBitsPerSecond: 10000000  // for video, aiming for 10 Mbps
+    audioBitsPerSecond: 128000,
+    videoBitsPerSecond: 10000000
   };
 
   const mediaRecorder = new MediaRecorder(stream, options);
 
   mediaRecorder.ondataavailable = async function (e) {
     if (e.data.size > 0) {
-      recordedChunks.push(e.data);
-
-
-      const reader = new FileReader();
-      reader.readAsDataURL(e.data);
-      reader.onloadend = () => {
-        chrome.runtime.sendMessage({ action: "add-recording-chunk", data: reader.result });
-      };
-
+      const arrayBuffer = await e.data.arrayBuffer();
+      chrome.storage.local.set({ [`chunk_${chunkIndex}`]: Array.from(new Uint8Array(arrayBuffer)) });
+      chunkIndex++;
     }
   };
   mediaRecorder.onstop = function () {
-    saveFile(recordedChunks);
-    recordedChunks = [];
-
+    saveFile();
     chrome.runtime.sendMessage({ action: "recording-stopped" });
   };
   mediaRecorder.start(200); // For every 200ms the stream data will be stored in a separate chunk.
@@ -88,31 +92,22 @@ chrome.runtime.onMessage.addListener(async function (
 
   if (request.action === "start-recording") {
     stream = await recordScreen();
-
     const videoTrack = stream.getVideoTracks()[0];
-
     videoTrack.onended = () => {
       console.log('User stopped sharing the screen');
       if (recorder && recorder.state === 'recording') {
         recorder.stop();
       }
     };
-
-
     const mimeType = 'video/webm; codecs="vp9,opus"';
     recorder = createRecorder(stream, mimeType);
-
     chrome.runtime.sendMessage({ action: "recording-started" });
   }
 
   if (request.action == "stop-recording") {
     console.log("stop recording");
     recorder.stop();
-
-
-    stream.getTracks()
-      .forEach(track => track.stop())
-
+    stream.getTracks().forEach(track => track.stop());
     chrome.runtime.sendMessage({ action: "recording-stopped" });
     return;
   }
